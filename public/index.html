@@ -1,0 +1,75 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta http-equiv="X-UA-Compatible" content="ie=edge">
+    <title>Document</title>
+</head>
+<body>
+    <div id="chat">
+        <div>
+        </div>
+        <ul>
+            <li v-for="message in messages">{{ message.user }}: {{ message.message }}</li>
+        </ul>
+        <div>Online: {{ online ? 'on' : 'off' }}</div>
+        <input type="text" v-if='online' v-model="newMessage" v-on:keyup.enter="send">
+        <button @click="send" v-if='online'>Send</button>
+        <button @click="disconnect" v-if='online'>Disconnect</button>
+
+        <input type="text" placeholder="Enter name" v-if='!online' v-model="userName" v-on:keyup.enter="connect">
+        <button @click="connect" v-if='!online'>Connect</button>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/vue@2.5.17/dist/vue.js"></script>
+    <script>
+        Vue.filter('disabled', function(val) { return val ? 'disabled': ''});
+        var chatApp = new Vue({
+            el: '#chat',
+            data() {
+                return {
+                    messages: [],
+                    newMessage: '',
+                    userName: '',
+                    online: false,
+                }
+            },
+            destroyed() {
+                this.ws.close();
+            },
+            methods: {
+                send() {
+                    this.ws.send(JSON.stringify({user: this.userName, message: this.newMessage}));
+                    this.newMessage = '';
+                },
+                messageHandler(message) {
+                    try {
+                        let data = JSON.parse(message.data);
+                        switch(data.type) {
+                            case 'messages':
+                                this.$set(this, 'messages', data.messages);
+                                break;
+                            case 'message':
+                                this.messages.push(JSON.parse(data.message));
+                                break;
+                        }
+                    } catch (e) {console.error(e)}
+                },
+                disconnect() {
+                    this.ws.close();
+                },
+                connect() {
+                    if (this.online) return false;
+                    this.ws = new WebSocket('ws://' + location.host.replace(':5000', '') + ':5555');
+                    this.ws.addEventListener('open', () => { this.online = true });
+                    this.ws.addEventListener('close', () => { this.online = false });
+                    this.ws.addEventListener('error', (err) => { console.error(err) });
+                    this.ws.addEventListener('message', this.messageHandler.bind(this));
+                }
+            }
+            
+        })
+    </script>
+</body>
+</html>
